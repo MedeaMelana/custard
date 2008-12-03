@@ -1,0 +1,19 @@
+Name:           Custard
+Version:        @tag
+Synopsis:       A MUD driver
+Description:    A MUD driver for Haskell
+
+Author:         Martijn van Steenbergen
+Maintainer:     martijn@van.steenbergen.nl
+Copyright:      Copyright (c) 2008 Martijn van Steenbergen
+Homepage:       http://martijn.van.steenbergen.nl/projects/custard/
+
+Cabal-Version:  >= 1.2
+License:        BSD3
+License-file:   LICENSE
+Category:       Network
+Build-type:     Simple
+
+Library
+  Build-Depends:    base, network
+  Exposed-Modules:  Network.Custard
