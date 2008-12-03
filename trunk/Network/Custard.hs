@@ -47,6 +47,7 @@ handleClient vWorld h hostname = mdo
   roomSay room (/= player) (name ++ " suddenly appears beside you.")
   
   loopReadCommand player
+  putStrLn $ "Goodbye, " ++ name ++ "."
   hClose h
 
 notEmpty :: String -> Bool
@@ -60,10 +61,11 @@ loopReadCommand p = loop where
     case cmd of
       "l"                 -> look p >> loop
       'l':'o':'o':'k':_   -> look p >> loop
-      "q"                 -> exit p >> pWriteLn p "Goodbye!"
-      'q':'u':'i':'t':_   -> exit p >> pWriteLn p "Goodbye!"
+      "q"                 -> quit p
+      'q':'u':'i':'t':_   -> quit p
       's':'a':'y':' ':msg -> say p msg >> loop
       '\'':msg            -> say p msg >> loop
+      ':':msg         -> emote p msg >> loop
       _                   -> case M.lookup cmd (rExits room) of
         Nothing -> pWriteLn p ("Unrecognised command: " ++ cmd) >> loop
         Just room' -> move p room' >> loop
@@ -194,3 +196,14 @@ query p ok prompt = loop where
 
 trim :: String -> String
 trim = f . f where f = reverse . dropWhile C.isSpace
+
+quit :: Player -> IO ()
+quit p = do
+  Just room <- exit p
+  roomSay room (const True) $ pName p ++ " suddenly disappears in a bright flash!"
+  pWriteLn p "Thank you for playing!"
+
+emote :: Player -> String -> IO ()
+emote p msg = do
+  room <- readMVar (pRoom p)
+  roomSay room (const True) $ pName p ++ " " ++ msg
