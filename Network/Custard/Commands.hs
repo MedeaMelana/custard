@@ -11,9 +11,14 @@ import Control.Monad (when)
 
 quit :: Player -> IO ()
 quit p = do
+  rudeQuit p
+  pWriteLn p "Thank you for playing!"
+
+-- quit without talking to the client
+rudeQuit :: Player -> IO ()
+rudeQuit p = do
   Just room <- exit p
   roomSay room (const True) $ pName p ++ " suddenly disappears in a bright flash!"
-  pWriteLn p "Thank you for playing!"
 
 emote :: Player -> String -> IO ()
 emote p msg = do
