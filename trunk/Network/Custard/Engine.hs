@@ -8,32 +8,50 @@ import Network
 import Network.Custard.Core
 import System.IO
 import Network.Custard.Util
-import Network.Custard.Commands
+-- import Network.Custard.Commands
 import qualified Data.Map as M
 
-data ServerMessage
-    = Input String
-    | Disconnected
-    | NewPlayer String
+runCustard :: Int -> IO ()
+runCustard port = runMud $ do
+  liftIO $ putStrLn $ "Listening on port " ++ show port ++ "..."
+  -- what are we running here?
+  -- vWorld <- newMVar emptyMud
+  -- runMud world vWorld
+  -- world
+  -- serverToClient <- newChan
+  -- clientToServer <- newChan
+  state <- get
+  let channel = mChan state
+  liftIO $ forkIO $ handleServer channel
+  liftIO $ listenOn (PortNumber $ fromIntegral port) >>= loopAccept
 
-data ClientMessage
-    = Message String
-    | Kill
+handleServer channel = do
+  msg <- liftIO readChan
+  let cont = handleServer channel
+  case msg of
+    NewPlayer name chan -> newPlayer name chan
+    Died      name -> undefined
+    Input name str -> undefined
 
-runCustard :: Int -> Mud () -> IO ()
-runCustard port world = do
-  putStrLn $ "Listening on port " ++ show port ++ "..."
-  vWorld <- newMVar emptyMud
-  runMud world vWorld
-  listenOn (PortNumber $ fromIntegral port) >>= loopAccept vWorld
+newPlayer name chan = do
+  room <- gets $ head . mRooms
+  enter player room
+  look player
+  roomSay room (/= player) (name ++ " suddenly appears beside you.")
+  liftIO $ writeChan chan ServerAck
 
-loopAccept :: MVar MudState -> Socket -> IO ()
-loopAccept vWorld sock = do
+handleClient = undefined
+
+loopAccept :: Socket -> IO ()
+loopAccept sock = do
   hSetBuffering stdout NoBuffering
   (h, hostname, _) <- accept sock
-  forkIO (handleClient vWorld h hostname)
-  loopAccept vWorld sock
+  forkIO (handleClient h hostname)
+  loopAccept sock
 
+-- TODO mayor fixing needed ahead
+
+{-
 handleClient :: MVar MudState -> Handle -> HostName -> IO ()
 handleClient vWorld h hostname = mdo
   putStrLn $ "Incoming connection from " ++ hostname ++ "."
@@ -75,6 +93,6 @@ loopReadCommand p = loop where
         Nothing -> pWriteLn p ("Unrecognised command: " ++ cmd) >> loop
         Just room' -> move p room' >> loop
 
-runMud :: Mud a -> MudState -> a
-runMud act = fst . runStateT act
-
+-- runMud :: Mud a -> MudState -> a
+-- runMud act = fst . runStateT act
+-}

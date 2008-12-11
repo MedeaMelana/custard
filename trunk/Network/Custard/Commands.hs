@@ -8,39 +8,49 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import Control.Concurrent
 import Control.Monad (when)
+import Control.Monad.State (gets)
 
-quit :: Player -> IO ()
+quit :: Player -> Mud ()
 quit p = do
   rudeQuit p
   pWriteLn p "Thank you for playing!"
 
 -- quit without talking to the client
-rudeQuit :: Player -> IO ()
+rudeQuit :: Player -> Mud ()
 rudeQuit p = do
   Just room <- exit p
   roomSay room (const True) $ pName p ++ " suddenly disappears in a bright flash!"
 
-emote :: Player -> String -> IO ()
+emote :: Player -> String -> Mud ()
 emote p msg = do
-  room <- readMVar (pRoom p)
+  let room = pRoom p
   roomSay room (const True) $ pName p ++ " " ++ msg
 
-roomSay :: Room -> (Player -> Bool) -> String -> IO ()
+roomSay :: Room -> (Player -> Bool) -> String -> Mud ()
 roomSay room ok msg = do
-  ps <- fmap (filter ok . S.toList) $ readMVar (rPlayers room)
-  let say p = pWriteLn p msg
-  sequence (map say ps)
-  return ()
+   let ps = filter ok $ S.toList $ rPlayers room
+   let say p = pWriteLn p msg
+   sequence (map say ps)
+   return ()
 
-say :: Player -> String -> IO ()
+say :: Player -> String -> Mud ()
 say p msg = do
-  room <- readMVar (pRoom p)
+  let room = pRoom p
   pWriteLn p $ "You say: " ++ msg
   roomSay room (/= p) (pName p ++ " says: " ++ msg)
+
+exit = undefined
+
+-- TODO mayor fixing neaded ahead
+
+{-
 
 exit :: Player -> IO (Maybe Room)
 exit p = do
   mRoom <- tryTakeMVar (pRoom p)
+
+  -- problem: updating a room is hard (you have to find it in de MudState first)
+  -- possible fix: have a Map Room (S.Set Player) in the MudState.
 
   when (isJust mRoom) $ do
     mapMVar (rPlayers (fromJust mRoom)) (S.delete p)
@@ -76,3 +86,4 @@ look p = do
   let output = unlines $ [ rName room ] ++ playerLines ++ [ "Exits: " ++ exits ]
   pWrite p output
 
+-}
