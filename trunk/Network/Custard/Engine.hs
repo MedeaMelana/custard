@@ -30,7 +30,10 @@ handleClient vWorld h hostname = mdo
   putStrLn $ "Incoming connection from " ++ hostname ++ "."
 
   vRoom <- newEmptyMVar
-  let player = Player name vRoom (\s -> hPutStr h s >> hFlush h) (hGetLine h)
+  let exitFirst err = rudeQuit player >> ioError err
+  let safePut s = catch (hPutStr h s >> hFlush h) exitFirst
+  let safeGet   = catch (hGetLine h)              exitFirst
+  let player = Player name vRoom safePut safeGet
 
   pWriteLn player "Welcome!"
   name <- query player (\s -> notEmpty s && length (trim s) < 12) "By what name do you wish to be known? "
