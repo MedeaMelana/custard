@@ -11,6 +11,15 @@ import Network.Custard.Util
 import Network.Custard.Commands
 import qualified Data.Map as M
 
+data ServerMessage
+    = Input String
+    | Disconnected
+    | NewPlayer String
+
+data ClientMessage
+    = Message String
+    | Kill
+
 runCustard :: Int -> Mud () -> IO ()
 runCustard port world = do
   putStrLn $ "Listening on port " ++ show port ++ "..."
@@ -66,9 +75,6 @@ loopReadCommand p = loop where
         Nothing -> pWriteLn p ("Unrecognised command: " ++ cmd) >> loop
         Just room' -> move p room' >> loop
 
-runMud :: Mud a -> MVar MudState -> IO a
-runMud act vWorld = do
-  world <- takeMVar vWorld
-  (res, world') <- runStateT act world
-  putMVar vWorld world'
-  return res
+runMud :: Mud a -> MudState -> a
+runMud act = fst . runStateT act
+
