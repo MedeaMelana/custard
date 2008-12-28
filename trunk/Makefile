@@ -1,5 +1,5 @@
 default:
-	runghc Main 5678
+	runghc -W Main 5678
 
 mtag = $(shell svn info | grep URL | sed 's/^.*Custard-//g')
 tag  = $(subst URL: svn://localhost/Custard/trunk,99.99,$(mtag))

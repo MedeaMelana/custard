@@ -20,6 +20,7 @@ splitCommand :: String -> Maybe (String, String)
 splitCommand s = case sanitizeInput s =~ "^([^a-zA-Z]+|[a-zA-Z]+)" :: MatchResult of
   (_, _, _, [])         -> Nothing
   (_, _, args, [verb])  -> Just (verb, args)
+  _                     -> error "unexpected regex result"
 
 sanitizeInput :: String -> String
 sanitizeInput = filter charOk . trim

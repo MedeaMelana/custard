@@ -29,3 +29,6 @@ Parameters: Chan ClientMessage, Handle.
 
 Todo:
 * Id Player altijd als laatst meegeven.
+* exits meer params geven (exit/enter messages)
+* move fixen.
+* look fixen.
