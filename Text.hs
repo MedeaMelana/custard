@@ -1,3 +1,4 @@
+-- | Some text utility functions.
 module Text where
 
 import Text.Regex.Posix
@@ -30,3 +31,10 @@ replaceAll :: String -> String -> String -> String
 replaceAll pat sub input = case input =~ pat :: MatchResult of
   (before, _, "", _)    -> before
   (before, _, after, _) -> before ++ sub ++ replaceAll pat sub after
+
+-- | listify ["a", "b", "c"] yields "a, b and c"
+listify :: [String] -> String
+listify [] = ""
+listify [x] = x
+listify [x, y] = x ++ " and " ++ y
+listify (x:xs) = x ++ ", " ++ listify xs
