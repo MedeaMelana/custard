@@ -2,12 +2,9 @@ module Mud where
 
 import qualified Data.IntMap as IM
 import qualified Data.Map as M
-import qualified Data.Set as S
 import qualified Data.Char as C
 import Data.Accessor
-import Data.Accessor.Template
 import Control.Monad.State
-import Text.Regex.Posix
 import MudTypes
 import Text
 import With
@@ -37,9 +34,10 @@ loginContext p = Context
         (_, True)   -> tellLn p "Sorry, that name is already taken."
         _           -> do
           room <- defaultRoom
-          mPlayers .> byId p .> pName     %= Just name
-          mPlayers .> byId p .> pRoom     %= Just room
-          mPlayers .> byId p .> pContext  %= playContext p
+          with (mPlayers .> byId p) $ do
+            pName     %= Just name
+            pRoom     %= Just room
+            pContext  %= playContext p
           look p
   }
 

@@ -4,15 +4,11 @@ module Engine where
 
 import Network
 import System.IO
-import System.Environment
 import Control.Concurrent
 import Control.Monad.State
 import qualified Data.List as L
-import qualified Data.Set as S
 import qualified Data.Char as C
 import qualified Data.Map as M
-import Data.Maybe
-import Text.Regex.Posix
 import MudTypes
 import Mud
 import Text
@@ -73,8 +69,9 @@ runServerListener p h listenToServer = do
   let loop = runServerListener p h listenToServer
   msg <- listenToServer
   case msg of
-    Output s -> hPutStr h s >> hFlush h >> loop
-    Kill     -> hClose h
+    Output s      -> hPutStr h s >> hFlush h >> loop
+    Kill          -> hClose h
+    Registered _  -> error "unexpected message from server: Registered"
 
 
 type PlayerMap = M.Map (Id Player) (Output ClientMessage)
@@ -95,9 +92,10 @@ runServer readMessage mkWorld = loop M.empty world where
       Input p line -> do
         (_, state') <- runMud players state (execute p line >> prompt p)
         loop players state'
-      Disconnected p -> undefined
+      Disconnected _ -> undefined
       Shutdown -> undefined
 
+-- | Runs a Mud computation, yielding the result and the new state.
 runMud :: PlayerMap -> MudState -> Mud a -> IO (a, MudState)
 runMud ps state action = do
   let (v, state')   = runState action state
@@ -105,6 +103,7 @@ runMud ps state action = do
   sendMessages ps ms
   return (v, state'')
 
+-- | Sends all messages to the right clients.
 sendMessages :: PlayerMap -> [Message] -> IO ()
 sendMessages ps = mapM_ $ \(p, m) -> do
   let tellClient = ps M.! p
