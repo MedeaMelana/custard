@@ -15,11 +15,12 @@ import Data.Maybe
 import Text.Regex.Posix
 import MudTypes
 import Mud
+import Text
 
 type Input  a =      IO a
 type Output a = a -> IO ()
 
--- Messages to the server in the context of a specific client.
+-- Messages to the server.
 data ServerMessage
   = NewClient (Output ClientMessage)
   | Input (Id Player) String
@@ -47,7 +48,6 @@ runListener tellServer sock = do
   -- Wait for connection.
   (h, host, _) <- accept sock
   putStrLn ("Incoming connection from " ++ host)  
-  -- hSetBuffering h NoBuffering
   -- Create new channel and obtain player id.
   clientChan <- newChan
   tellServer (NewClient (writeChan clientChan))
@@ -58,16 +58,16 @@ runListener tellServer sock = do
   -- Start listening again.
   loop
 
--- | Listens for messages from the client connection.
+-- | One per client: listens for messages from the client connection.
 runInputListener :: Id Player -> Handle -> Output ServerMessage -> IO ()
 runInputListener p h tellServer = do
   let loop = runInputListener p h tellServer
   line <- hGetLine h
-  tellServer (Input p line)
+  tellServer (Input p $ sanitizeInput line)
   -- todo: catch exceptions, test for eof
   loop
 
--- | Listens for ClientMessages from the server.
+-- | One per client: listens for ClientMessages from the server.
 runServerListener :: Id Player -> Handle -> Input ClientMessage -> IO ()
 runServerListener p h listenToServer = do
   let loop = runServerListener p h listenToServer
@@ -90,10 +90,10 @@ runServer readMessage mkWorld = loop M.empty world where
         let (p, state') = runState newPlayer state
         let players' = M.insert p tellClient players
         tellClient (Registered p)
-        (_, state'') <- runMud players' state' (return ())  -- cause messages to be sent
+        (_, state'') <- runMud players' state' (prompt p)  -- cause messages to be sent
         loop players' state''
       Input p line -> do
-        (_, state') <- runMud players state (execute p line)
+        (_, state') <- runMud players state (execute p line >> prompt p)
         loop players state'
       Disconnected p -> undefined
       Shutdown -> undefined
@@ -109,12 +109,3 @@ sendMessages :: PlayerMap -> [Message] -> IO ()
 sendMessages ps = mapM_ $ \(p, m) -> do
   let tellClient = ps M.! p
   tellClient (Output m)
-
--- query :: IO String -> (String -> IO ()) -> (String -> Bool)  -> String -> IO String
--- query read write ok prompt = loop where
---   loop = do
---     write prompt
---     line <- fmap trim read
---     if ok line
---       then return (trim line)
---       else loop

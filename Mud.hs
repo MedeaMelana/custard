@@ -10,6 +10,7 @@ import Control.Monad.State
 import Text.Regex.Posix
 import MudTypes
 import Text
+import With
 
 nextId :: Mud (Id a)
 nextId = do
@@ -20,10 +21,36 @@ nextId = do
 newPlayer :: Mud (Id Player)
 newPlayer = do
   pid <- nextId
-  let player = Player (error "player name not set") (error "player room not set")
+  let player = Player Nothing Nothing (loginContext pid)
   mPlayers %: (IM.insert pid player)
-  tellLn pid "Hello!"
+  tellLn pid "Welcome to Custard!"
   return pid
+
+loginContext :: Id Player -> Context
+loginContext p = Context
+  { cPrompt_  = return "By what name do you wish to be known? "
+  , cExecute_ = \name -> do
+      ps <- getA mPlayers
+      let taken = any (maybe False (== name) . pName_) (IM.elems ps)
+      case (nameOkay name, taken) of
+        (False, _)  -> tellLn p "Sorry, that is not a valid name."
+        (_, True)   -> tellLn p "Sorry, that name is already taken."
+        _           -> do
+          room <- defaultRoom
+          mPlayers .> byId p .> pName     %= Just name
+          mPlayers .> byId p .> pRoom     %= Just room
+          mPlayers .> byId p .> pContext  %= playContext p
+          look p
+  }
+
+playContext :: Id Player -> Context
+playContext p = Context
+  { cPrompt_  = return "> "
+  , cExecute_ = \cmd -> return ()  -- TODO: look in global verbs and room verbs
+  }
+
+defaultRoom :: Mud (Id Room)
+defaultRoom = liftM (head . IM.keys) (getA mRooms)
 
 mkRoom :: String -> Mud (Id Room)
 mkRoom name = do
@@ -43,39 +70,49 @@ east = "east"
 south = "south"
 west = "west"
 
--- | Executes a player's command.
+prompt :: Id Player -> Mud ()
+prompt p = do
+  computePrompt <- getA (mPlayers .> byId p .> pContext .> cPrompt)
+  computePrompt >>= tell p
+
 execute :: Id Player -> String -> Mud ()
 execute p cmd = do
-  cmds <- collectCommands p
-  case splitCommand cmd of
-    Nothing           -> return ()
-    Just (verb, args) ->
-      case M.lookup verb cmds of
-        Nothing     -> error "unrecognized command"
-        Just action -> action p args
+  exec <- getA (mPlayers .> byId p .> pContext .> cExecute)
+  exec cmd
 
--- | Yields the union of the global commands and the room-specific commands.
-collectCommands :: Id Player -> Mud Commands
-collectCommands p = do
-  global <- getA mCommands
-  room   <- getA (mPlayers .> byId p .> pRoom)
-  exits  <- exitCommands room
-  return (M.union exits global)
+-- -- | Executes a player's command.
+-- execute :: Id Player -> String -> Mud ()
+-- execute p cmd = do
+--   cmds <- collectCommands p
+--   case splitCommand cmd of
+--     Nothing           -> return ()
+--     Just (verb, args) ->
+--       case M.lookup verb cmds of
+--         Nothing     -> error "unrecognized command"
+--         Just action -> action p args
 
--- | Yields the commands in a specific room, including the exits.
-exitCommands :: Id Room -> Mud Commands
-exitCommands r = liftM toCommands $ getA (mRooms .> byId r .> rExits)
-  where toCommands = M.mapWithKey (\exitName _ player _ -> move player exitName)
+-- -- | Yields the union of the global commands and the room-specific commands.
+-- collectCommands :: Id Player -> Mud Commands
+-- collectCommands p = do
+--   global <- getA mCommands
+--   room   <- getA (mPlayers .> byId p .> pRoom)
+--   exits  <- exitCommands room
+--   return (M.union exits global)
+-- 
+-- -- | Yields the commands in a specific room, including the exits.
+-- exitCommands :: Id Room -> Mud Commands
+-- exitCommands r = liftM toCommands $ getA (mRooms .> byId r .> rExits)
+--   where toCommands = M.mapWithKey (\exitName _ player _ -> move player exitName)
 
 move :: Id Player -> String -> Mud ()
 move p exit = do
-  fromId  <- getA (mPlayers .> byId p .> pRoom)
-  destId  <- liftM (M.! exit) $ getA (mRooms .> byId fromId .> rExits)
-  pname   <- getA (mPlayers .> byId p .> pName)
+  Just fromId <- getA (mPlayers .> byId p .> pRoom)
+  destId      <- liftM (M.! exit) $ getA (mRooms .> byId fromId .> rExits)
+  Just pname  <- getA (mPlayers .> byId p .> pName)
   say fromId (pname ++ " leaves " ++ exit ++ ".")
-  mPlayers .> byId p .> pRoom %= destId
+  mPlayers .> byId p .> pRoom %= Just destId
   say destId (pname ++ " enters.")
-  -- look p
+  look p
 
 -- | Send a message to a player.
 tell :: Id Player -> String -> Mud ()
@@ -92,17 +129,12 @@ say r m = playersInRoom r >>= mapM_ (\p -> tell p m)
 playersInRoom :: Id Room -> Mud [Id Player]
 playersInRoom room = do
   pmap <- getA mPlayers
-  let inRoom = (== room) . (^. pRoom) . (pmap IM.!)
+  let inRoom = (== Just room) . (^. pRoom) . (pmap IM.!)
   return . filter inRoom . IM.keys $ pmap
-
--- moveEveryoneTo :: Id Room -> Mud ()
--- moveEveryoneTo r = do
---   ps <- getA mPlayers
---   forM_ (keys ps) (move r)
 
 -- | Tells whether a player is in the given room.
 inRoom :: Id Player -> Id Room -> Mud Bool
-inRoom p r = liftM (== r) $ getA (mPlayers .> byId p .> pRoom)
+inRoom p r = liftM (== Just r) $ getA (mPlayers .> byId p .> pRoom)
 
 -- | Yields all collected messages and empties the buffer.
 flushMessages :: Mud [Message]
@@ -111,5 +143,9 @@ flushMessages = do
   mMessages %= []
   return ms
 
-prompt :: Id Player -> Mud ()
-prompt p = tell p "> "
+look :: Id Player -> Mud ()
+look p = do
+  mr <- getA (mPlayers .> byId p .> pRoom)
+  case mr of
+    Nothing -> tellLn p "All around you is thick darkness, as far as the eye can see."
+    Just r  -> getA (mRooms .> byId r .> rName) >>= tellLn p
