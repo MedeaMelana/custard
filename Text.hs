@@ -13,12 +13,12 @@ notEmpty = not . all isSpace
 trim :: String -> String
 trim = f . f where f = reverse . dropWhile isSpace
 
-type MatchResult = (String, String, String, [String])
+type MatchRes = (String, String, String, [String])
 
 -- | Sanitizes and splits a command into verb and arguments.
 --   For example: say hello there --> ("say", "hello there")
 splitCommand :: String -> Maybe (String, String)
-splitCommand s = case sanitizeInput s =~ "^([^a-zA-Z]+|[a-zA-Z]+)" :: MatchResult of
+splitCommand s = case sanitizeInput s =~ "^([^a-zA-Z]+|[a-zA-Z]+)" :: MatchRes of
   (_, _, _, [])         -> Nothing
   (_, _, args, [verb])  -> Just (verb, args)
   _                     -> error "unexpected regex result"
@@ -28,7 +28,7 @@ sanitizeInput = filter charOk . trim
   where charOk c = ' ' <= c && c <= '~'
 
 replaceAll :: String -> String -> String -> String
-replaceAll pat sub input = case input =~ pat :: MatchResult of
+replaceAll pat sub input = case input =~ pat :: MatchRes of
   (before, _, "", _)    -> before
   (before, _, after, _) -> before ++ sub ++ replaceAll pat sub after
 
