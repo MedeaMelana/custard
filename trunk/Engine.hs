@@ -60,6 +60,7 @@ runInputListener p h tellServer = do
   let loop = runInputListener p h tellServer
   line <- hGetLine h
   tellServer (Input p $ sanitizeInput line)
+  threadDelay 200000  -- hinder spam
   -- todo: catch exceptions, test for eof
   loop
 
