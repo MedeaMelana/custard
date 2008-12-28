@@ -2,31 +2,18 @@ module World where
 
 import Mud
 import MudTypes
+import Verbs
 
 mkWorld :: Mud ()
 mkWorld = do
-  nw <- mkRoom "Northwest corner"
-  ne <- mkRoom "Northeast corner"
-  se <- mkRoom "Southeast corner"
-  sw <- mkRoom "Southwest corner"
-  mkExits nw [(east, ne), (south, sw)]
-  mkExits ne [(west, nw), (south, se)]
-  mkExits se [(north, ne), (west, sw)]
-  mkExits sw [(north, nw), (east, se)]
   installVerbs
+  
+  garden <- mkRoom "A lush garden"
+  living <- mkRoom "A warm living room"
+  kitchen <- mkRoom "A clean kitchen"
+  bedroom <- mkRoom "A cozy bedroom"
 
-installVerbs :: Mud ()
-installVerbs = do
-  mkLoneVerb "l" look
-  mkLoneVerb "look" look
-  mkLoneVerb "n" (move "north")
-  mkLoneVerb "e" (move "east")
-  mkLoneVerb "s" (move "south")
-  mkLoneVerb "w" (move "west")
-  mkLoneVerb "u" (move "up")
-  mkLoneVerb "d" (move "down")
-  mkVerb "say" playerSay
-  mkVerb "'" playerSay
-  mkVerb "chat" chat
-  mkVerb "emote" emote
-  mkVerb ":" emote
+  mkExits garden [(north, living)]
+  mkExits living [(south, garden), (east, kitchen), (up, bedroom)]
+  mkExits kitchen [(west, living)]
+  mkExits bedroom [(down, living)]
