@@ -25,3 +25,5 @@ installVerbs = do
   mkLoneVerb "w" (move "west")
   mkLoneVerb "u" (move "up")
   mkLoneVerb "d" (move "down")
+  mkVerb "say" playerSay
+  mkVerb "'" playerSay
