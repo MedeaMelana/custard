@@ -37,8 +37,8 @@ loginContext p = Context
           room <- defaultRoom
           with (mPlayers .> byId p) $ do
             pName     %= Just name
-            pRoom     %= Just room
             pContext  %= playContext p
+          appear room p
           look p
   }
 
@@ -108,24 +108,32 @@ move exit p = do
   case mDestId of
     Nothing -> tellLn p "You cannot go in that direction."
     Just destId -> do
-      sayLn fromId (pname ++ " leaves " ++ exit ++ ".")
+      sayLn fromId (/= p) (pname ++ " leaves " ++ exit ++ ".")
       mPlayers .> byId p .> pRoom %= Just destId
-      sayLn destId (pname ++ " enters.")
+      sayLn destId (/= p) (pname ++ " enters.")
       look p
+
+appear :: Id Room -> Id Player -> Mud ()
+appear r p = do
+  mPlayers .> byId p .> pRoom %= Just r
+  Just name <- getA (mPlayers .> byId p .> pName)
+  sayLn r (/= p) (name ++ " suddenly appears right beside you!")
 
 -- | Send a message to a player.
 tell :: Id Player -> String -> Mud ()
 tell p m = mMessages %: (++ [(p, m)])
 
+-- | Calls tell with a newline appended to the message.
 tellLn :: Id Player -> String -> Mud ()
 tellLn p m = tell p (m ++ "\n")
 
--- | Send a message to all players in a room.
-say :: Id Room -> String -> Mud ()
-say r m = playersInRoom r >>= mapM_ (\p -> tell p m)
+-- | Send a message to all players in a room that satisfy the condition.
+say :: Id Room -> (Id Player -> Bool) -> String -> Mud ()
+say r ok m = playersInRoom r >>= mapM_ (\p -> when (ok p) $ tell p m)
 
-sayLn :: Id Room -> String -> Mud ()
-sayLn r m = say r (m ++ "\n")
+-- | Calls say with a newline appended to the message.
+sayLn :: Id Room -> (Id Player -> Bool) -> String -> Mud ()
+sayLn r ok m = say r ok (m ++ "\n")
 
 -- | Yield all players in a room.
 playersInRoom :: Id Room -> Mud [Id Player]
