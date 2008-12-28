@@ -186,3 +186,11 @@ mkVerb verb action = mVerbs %: M.insert verb action
 -- | Installs a verb that ignores its arguments.
 mkLoneVerb :: String -> (Id Player -> Mud ()) -> Mud ()
 mkLoneVerb verb action = mkVerb verb (const action)
+
+playerSay :: Verb
+playerSay msg p = do
+  let trimmed = trim msg
+  Just room <- getA (mPlayers .> byId p .> pRoom)
+  Just name <- getA (mPlayers .> byId p .> pName)
+  sayLn room (/= p) (name ++ " says: " ++ trimmed)
+  tellLn p ("You say: " ++ trimmed)
