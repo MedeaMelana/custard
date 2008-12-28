@@ -157,8 +157,8 @@ mkVerb :: String -> Verb -> Mud ()
 mkVerb verb action = mVerbs %: M.insert verb action
 
 -- | Installs a verb that ignores its arguments.
-mkLoneVerb :: String -> (Id Player -> Mud ()) -> Mud ()
-mkLoneVerb verb action = mkVerb verb (const action)
+mkSimpleVerb :: String -> (Id Player -> Mud ()) -> Mud ()
+mkSimpleVerb verb action = mkVerb verb (const action)
 
 
 move :: String -> Id Player -> Mud ()
