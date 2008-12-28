@@ -39,7 +39,6 @@ loginContext p = Context
             pName     %= Just name
             pContext  %= playContext p
           appear room p
-          look p
   }
 
 playContext :: Id Player -> Context
@@ -76,6 +75,8 @@ north = "north"
 east = "east"
 south = "south"
 west = "west"
+up = "up"
+down = "down"
 
 prompt :: Id Player -> Mud ()
 prompt p = do
@@ -100,24 +101,12 @@ exitVerbs :: Id Room -> Mud Verbs
 exitVerbs r = liftM toCommands $ getA (mRooms .> byId r .> rExits)
   where toCommands = M.mapWithKey (\exitName _ _ player -> move exitName player)
 
-move :: String -> Id Player -> Mud ()
-move exit p = do
-  Just fromId <- getA (mPlayers .> byId p .> pRoom)
-  mDestId     <- liftM (M.lookup exit) $ getA (mRooms .> byId fromId .> rExits)
-  Just pname  <- getA (mPlayers .> byId p .> pName)
-  case mDestId of
-    Nothing -> tellLn p "You cannot go in that direction."
-    Just destId -> do
-      sayLn fromId (/= p) (pname ++ " leaves " ++ exit ++ ".")
-      mPlayers .> byId p .> pRoom %= Just destId
-      sayLn destId (/= p) (pname ++ " enters.")
-      look p
-
 appear :: Id Room -> Id Player -> Mud ()
 appear r p = do
   mPlayers .> byId p .> pRoom %= Just r
   Just name <- getA (mPlayers .> byId p .> pName)
   sayLn r (/= p) (name ++ " suddenly appears right beside you!")
+  look p
 
 -- | Send a message to a player.
 tell :: Id Player -> String -> Mud ()
@@ -163,7 +152,29 @@ flushMessages = do
   mMessages %= []
   return ms
 
--- | Describe a player's surroundings to them.
+-- | Installs a verb.
+mkVerb :: String -> Verb -> Mud ()
+mkVerb verb action = mVerbs %: M.insert verb action
+
+-- | Installs a verb that ignores its arguments.
+mkLoneVerb :: String -> (Id Player -> Mud ()) -> Mud ()
+mkLoneVerb verb action = mkVerb verb (const action)
+
+
+move :: String -> Id Player -> Mud ()
+move exit p = do
+  Just fromId <- getA (mPlayers .> byId p .> pRoom)
+  mDestId     <- liftM (M.lookup exit) $ getA (mRooms .> byId fromId .> rExits)
+  Just pname  <- getA (mPlayers .> byId p .> pName)
+  case mDestId of
+    Nothing -> tellLn p "You cannot go in that direction."
+    Just destId -> do
+      sayLn fromId (/= p) (pname ++ " leaves " ++ exit ++ ".")
+      mPlayers .> byId p .> pRoom %= Just destId
+      sayLn destId (/= p) (pname ++ " enters.")
+      look p
+      -- | Describe a player's surroundings to them.
+
 look :: Id Player -> Mud ()
 look p = do
   mr <- getA (mPlayers .> byId p .> pRoom)
@@ -189,33 +200,3 @@ look p = do
       case exitNames of
         []  -> return ()
         _   -> tellLn p ("Exits: " ++ listify exitNames ++ ".")
-
--- | Installs a verb.
-mkVerb :: String -> Verb -> Mud ()
-mkVerb verb action = mVerbs %: M.insert verb action
-
--- | Installs a verb that ignores its arguments.
-mkLoneVerb :: String -> (Id Player -> Mud ()) -> Mud ()
-mkLoneVerb verb action = mkVerb verb (const action)
-
-playerSay :: Verb
-playerSay msg p = do
-  let trimmed = trim msg
-  Just room <- getA (mPlayers .> byId p .> pRoom)
-  Just name <- getA (mPlayers .> byId p .> pName)
-  sayLn room (/= p) (name ++ " says: " ++ trimmed)
-  tellLn p ("You say: " ++ trimmed)
-
-chat :: Verb
-chat msg p = do
-  Just name <- getA (mPlayers .> byId p .> pName)
-  let trimmed = trim msg
-  shoutLn (const True) ("(chat) " ++ name ++ ": " ++ trimmed)
-
-emote :: Verb
-emote msg p = do
-  Just room <- getA (mPlayers .> byId p .> pRoom)
-  Just name <- getA (mPlayers .> byId p .> pName)
-  let line = name ++ " " ++ trim msg
-  sayLn room (/= p) line
-  tellLn p ("You emote: " ++ line)
