@@ -25,15 +25,16 @@ data MudState = MudState
   , mRooms_     :: IdSet Room
   , mIds_       :: [Int]
   , mMessages_  :: [Message]
-  , mCommands_  :: Commands
+  , mVerbs_     :: M.Map String (String -> Mud ())
   }
 
 emptyMud :: MudState
 emptyMud = MudState IM.empty IM.empty [0..] [] M.empty
 
 data Player = Player
-  { pName_  :: String
-  , pRoom_  :: Id Room
+  { pName_    :: Maybe String
+  , pRoom_    :: Maybe (Id Room)
+  , pContext_ :: Context
   }
 
 data Room = Room
@@ -43,10 +44,12 @@ data Room = Room
   , rExits_     :: M.Map String (Id Room)
   }
 
-type Commands = M.Map String Command
-type Command = Id Player -> String -> Mud ()
-
+data Context = Context
+  { cPrompt_  :: Mud String
+  , cExecute_ :: String -> Mud ()
+  }
 
 $( deriveAccessors ''MudState )
 $( deriveAccessors ''Player )
 $( deriveAccessors ''Room )
+$( deriveAccessors ''Context )
