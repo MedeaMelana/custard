@@ -20,12 +20,15 @@ byId key = accessor (IM.! key) (IM.insert key)
 
 type Message = (Id Player, String)
 
+type Verb = Id Player -> String -> Mud ()  -- issuer -> args -> action
+type Verbs = M.Map String Verb  -- verb name -> verb
+
 data MudState = MudState
   { mPlayers_   :: IdSet Player
   , mRooms_     :: IdSet Room
   , mIds_       :: [Int]
   , mMessages_  :: [Message]
-  , mVerbs_     :: M.Map String (String -> Mud ())
+  , mVerbs_     :: Verbs
   }
 
 emptyMud :: MudState
@@ -38,15 +41,16 @@ data Player = Player
   }
 
 data Room = Room
-  { rId_        :: Id Room
-  , rName_      :: String
+  { rName_      :: String
   , rDesc_      :: String
   , rExits_     :: M.Map String (Id Room)
   }
 
+-- | A context determines a player's prompt and how their input is handled.
+--   Examples: login, normal play, reading a paged piece of text, in editor.
 data Context = Context
-  { cPrompt_  :: Mud String
-  , cExecute_ :: String -> Mud ()
+  { cPrompt_  :: Mud String       -- ^ Computes the prompt to show.
+  , cExecute_ :: String -> Mud () -- ^ Executes the player's input.
   }
 
 $( deriveAccessors ''MudState )
