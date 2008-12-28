@@ -4,6 +4,7 @@ import Mud
 import MudTypes
 import Text
 import Data.Accessor
+import qualified Data.Map as M
 
 playerSay :: Verb
 playerSay msg p = do
@@ -27,6 +28,11 @@ emote msg p = do
   sayLn room (/= p) line
   tellLn p ("You emote: " ++ line)
 
+help :: Verb
+help _ p = do
+  verbs <- M.keys `fmap` getA mVerbs
+  tellLn p ("Available commands: " ++ listify verbs ++ ".")
+
 installVerbs :: Mud ()
 installVerbs = do
   mkLoneVerb "l" look
@@ -42,3 +48,4 @@ installVerbs = do
   mkVerb "chat" chat
   mkVerb "emote" emote
   mkVerb ":" emote
+  mkVerb "help" help
