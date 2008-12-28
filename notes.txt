@@ -1,0 +1,25 @@
+Overview of threads:
+
+Incoming
+  * Listens to incoming connections. At new connection:
+    * Sends handle to server at every new incoming connection.
+    * Spawns new Player Input thread.
+
+Server
+  * Maintains state.
+  * Listens to incoming server messages:
+    * Input: Process input from player. Update state.
+        Will result in output to players, which is send to their respective channels.
+    * ConnectionLost: the connection with the player was lost.
+    * Logoff: closes the connection with the player.
+    * Shutdown: the MUD is to shut down cleanly.
+
+Player Input
+Parameters: Chan ServerMessage, Handle.
+  * Listens to messages from the connection. Passes them on to the server (Input).
+
+Player Client
+Parameters: Chan ClientMessage, Handle.
+  * Listens to messages from the server:
+    * Output. Send output to the client's terminal.
+    * Kill. Forcibly terminates the session with the client.
