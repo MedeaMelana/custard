@@ -35,14 +35,14 @@ help _ p = do
 
 installVerbs :: Mud ()
 installVerbs = do
-  mkLoneVerb "l" look
-  mkLoneVerb "look" look
-  mkLoneVerb "n" (move "north")
-  mkLoneVerb "e" (move "east")
-  mkLoneVerb "s" (move "south")
-  mkLoneVerb "w" (move "west")
-  mkLoneVerb "u" (move "up")
-  mkLoneVerb "d" (move "down")
+  mkSimpleVerb "l" look
+  mkSimpleVerb "look" look
+  mkSimpleVerb "n" (move "north")
+  mkSimpleVerb "e" (move "east")
+  mkSimpleVerb "s" (move "south")
+  mkSimpleVerb "w" (move "west")
+  mkSimpleVerb "u" (move "up")
+  mkSimpleVerb "d" (move "down")
   mkVerb "say" playerSay
   mkVerb "'" playerSay
   mkVerb "chat" chat
