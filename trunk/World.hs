@@ -27,3 +27,6 @@ installVerbs = do
   mkLoneVerb "d" (move "down")
   mkVerb "say" playerSay
   mkVerb "'" playerSay
+  mkVerb "chat" chat
+  mkVerb "emote" emote
+  mkVerb ":" emote

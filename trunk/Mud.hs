@@ -135,6 +135,16 @@ say r ok m = playersInRoom r >>= mapM_ (\p -> when (ok p) $ tell p m)
 sayLn :: Id Room -> (Id Player -> Bool) -> String -> Mud ()
 sayLn r ok m = say r ok (m ++ "\n")
 
+-- | Send a message to all players that satisfy the condition.
+shout :: (Id Player -> Bool) -> String -> Mud ()
+shout ok m = do
+  ps <- getA mPlayers
+  forM_ (filter ok $ IM.keys ps) $ \p -> tell p m
+
+-- | Calls shout with a newline appended to the message.
+shoutLn :: (Id Player -> Bool) -> String -> Mud ()
+shoutLn ok m = shout ok (m ++ "\n")
+
 -- | Yield all players in a room.
 playersInRoom :: Id Room -> Mud [Id Player]
 playersInRoom room = do
@@ -153,6 +163,7 @@ flushMessages = do
   mMessages %= []
   return ms
 
+-- | Describe a player's surroundings to them.
 look :: Id Player -> Mud ()
 look p = do
   mr <- getA (mPlayers .> byId p .> pRoom)
@@ -194,3 +205,17 @@ playerSay msg p = do
   Just name <- getA (mPlayers .> byId p .> pName)
   sayLn room (/= p) (name ++ " says: " ++ trimmed)
   tellLn p ("You say: " ++ trimmed)
+
+chat :: Verb
+chat msg p = do
+  Just name <- getA (mPlayers .> byId p .> pName)
+  let trimmed = trim msg
+  shoutLn (const True) ("(chat) " ++ name ++ ": " ++ trimmed)
+
+emote :: Verb
+emote msg p = do
+  Just room <- getA (mPlayers .> byId p .> pRoom)
+  Just name <- getA (mPlayers .> byId p .> pName)
+  let line = name ++ " " ++ trim msg
+  sayLn room (/= p) line
+  tellLn p ("You emote: " ++ line)
