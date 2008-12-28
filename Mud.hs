@@ -52,7 +52,7 @@ playContext p = Context
         Just (verb, args) ->
           case M.lookup verb cmds of
             Nothing     -> tellLn p "Unrecognised command."
-            Just action -> action p args
+            Just action -> action args p
   }
 
 -- | Yield the room players end up in right after logging in.
@@ -98,7 +98,7 @@ collectVerbs p = do
 -- | Yields the verbs in a specific room, including the exits.
 exitVerbs :: Id Room -> Mud Verbs
 exitVerbs r = liftM toCommands $ getA (mRooms .> byId r .> rExits)
-  where toCommands = M.mapWithKey (\exitName _ player _ -> move exitName player)
+  where toCommands = M.mapWithKey (\exitName _ _ player -> move exitName player)
 
 move :: String -> Id Player -> Mud ()
 move exit p = do
@@ -180,9 +180,9 @@ look p = do
         _   -> tellLn p ("Exits: " ++ listify exitNames ++ ".")
 
 -- | Installs a verb.
-mkVerb :: String -> (Id Player -> String -> Mud ()) -> Mud ()
+mkVerb :: String -> Verb -> Mud ()
 mkVerb verb action = mVerbs %: M.insert verb action
 
 -- | Installs a verb that ignores its arguments.
 mkLoneVerb :: String -> (Id Player -> Mud ()) -> Mud ()
-mkLoneVerb verb action = mkVerb verb (const . action)
+mkLoneVerb verb action = mkVerb verb (const action)
