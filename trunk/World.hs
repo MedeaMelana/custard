@@ -19,7 +19,9 @@ installVerbs :: Mud ()
 installVerbs = do
   mkLoneVerb "l" look
   mkLoneVerb "look" look
-  mkLoneVerb "n" (flip move "north")
-  mkLoneVerb "e" (flip move "east")
-  mkLoneVerb "s" (flip move "south")
-  mkLoneVerb "w" (flip move "west")
+  mkLoneVerb "n" (move "north")
+  mkLoneVerb "e" (move "east")
+  mkLoneVerb "s" (move "south")
+  mkLoneVerb "w" (move "west")
+  mkLoneVerb "u" (move "up")
+  mkLoneVerb "d" (move "down")

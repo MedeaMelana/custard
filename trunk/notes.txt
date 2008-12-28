@@ -32,3 +32,4 @@ Todo:
 * exits meer params geven (exit/enter messages)
 * move fixen.
 * look fixen.
+* Disconnected bouwen

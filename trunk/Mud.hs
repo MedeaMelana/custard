@@ -3,6 +3,7 @@ module Mud where
 import qualified Data.IntMap as IM
 import qualified Data.Map as M
 import qualified Data.Char as C
+import Data.Maybe (catMaybes)
 import Data.Accessor
 import Control.Monad.State
 import MudTypes
@@ -87,20 +88,20 @@ execute p cmd = do
   exec cmd
 
 -- | Yields the union of the global commands and the room-specific commands.
-collectVerbs :: Id Player -> Mud (M.Map String (Id Player -> String -> Mud ()))
+collectVerbs :: Id Player -> Mud Verbs
 collectVerbs p = do
   global <- getA mVerbs
   Just room   <- getA (mPlayers .> byId p .> pRoom)
   exits  <- exitVerbs room
   return (M.union exits global)
 
--- | Yields the commands in a specific room, including the exits.
+-- | Yields the verbs in a specific room, including the exits.
 exitVerbs :: Id Room -> Mud Verbs
 exitVerbs r = liftM toCommands $ getA (mRooms .> byId r .> rExits)
-  where toCommands = M.mapWithKey (\exitName _ player _ -> move player exitName)
+  where toCommands = M.mapWithKey (\exitName _ player _ -> move exitName player)
 
-move :: Id Player -> String -> Mud ()
-move p exit = do
+move :: String -> Id Player -> Mud ()
+move exit p = do
   Just fromId <- getA (mPlayers .> byId p .> pRoom)
   mDestId     <- liftM (M.lookup exit) $ getA (mRooms .> byId fromId .> rExits)
   Just pname  <- getA (mPlayers .> byId p .> pName)
@@ -148,8 +149,27 @@ look :: Id Player -> Mud ()
 look p = do
   mr <- getA (mPlayers .> byId p .> pRoom)
   case mr of
-    Nothing -> tellLn p "All around you is thick darkness, as far as the eye can see."
-    Just r  -> getA (mRooms .> byId r .> rName) >>= tellLn p
+    Nothing ->
+      tellLn p "All around you is thick darkness, as far as the eye can see."
+    Just r  -> do
+      room <- getA (mRooms .> byId r)
+
+      -- Room name.
+      tellLn p (room ^. rName)
+
+      -- Players in room.
+      ps <- liftM (filter (/= p)) (playersInRoom r)
+      playerNames <- liftM catMaybes $ forM ps $ \q -> getA (mPlayers .> byId q .> pName)
+      case playerNames of
+        []  -> return ()
+        [q] -> tellLn p (q ++ " is here.")
+        _   -> tellLn p (listify playerNames ++ " are here.")
+
+      -- Exits.
+      exitNames <- liftM M.keys $ getA (mRooms .> byId r .> rExits)
+      case exitNames of
+        []  -> return ()
+        _   -> tellLn p ("Exits: " ++ listify exitNames ++ ".")
 
 -- | Installs a verb.
 mkVerb :: String -> (Id Player -> String -> Mud ()) -> Mud ()
