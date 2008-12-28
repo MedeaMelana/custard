@@ -20,7 +20,7 @@ byId key = accessor (IM.! key) (IM.insert key)
 
 type Message = (Id Player, String)
 
-type Verb = Id Player -> String -> Mud ()  -- issuer -> args -> action
+type Verb = String -> Id Player -> Mud ()  -- issuer -> args -> action
 type Verbs = M.Map String Verb  -- verb name -> verb
 
 data MudState = MudState
