@@ -32,17 +32,12 @@ data ClientMessage
   | Output String
   | Kill
 
-main :: IO ()
-main = do
-  port : _ <- getArgs
-  runCustard (fromIntegral $ read port)
-
 -- | Spawns the server, then becomes the listener.
-runCustard :: PortNumber -> IO ()
-runCustard port = do
+runCustard :: PortNumber -> Mud () -> IO ()
+runCustard port mkWorld = do
   putStrLn $ "Listening on port " ++ show port ++ "..."
   serverChan <- newChan  -- messages to the server
-  forkIO $ runServer (readChan serverChan)
+  forkIO $ runServer (readChan serverChan) mkWorld
   listenOn (PortNumber port) >>= runListener (writeChan serverChan)
 
 -- | Listens for incoming connections.
@@ -85,8 +80,9 @@ runServerListener p h listenToServer = do
 type PlayerMap = M.Map (Id Player) (Output ClientMessage)
 
 -- | The server processes messages from clients.
-runServer :: Input ServerMessage -> IO ()
-runServer readMessage = loop M.empty emptyMud where
+runServer :: Input ServerMessage -> Mud () -> IO ()
+runServer readMessage mkWorld = loop M.empty world where
+  world = execState mkWorld emptyMud
   loop players state = do
     msg <- readMessage
     case msg of

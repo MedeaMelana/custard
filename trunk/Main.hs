@@ -1,10 +1,10 @@
 module Main where
 
-import Network.Custard.Engine
-import Network.Custard.World
+import Engine
+import World
 import System.Environment
 
 main :: IO ()
 main = do
-  [port] <- getArgs
-  runCustard (read port) mkWorld
+  port : _ <- getArgs
+  runCustard (fromIntegral $ read port) mkWorld
