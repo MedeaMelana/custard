@@ -29,6 +29,8 @@ data ClientMessage
   | Output String
   | Kill
 
+type ServerState = MVar (MudState, PlayerMap)
+
 -- | Spawns the server, then becomes the listener.
 runCustard :: PortNumber -> Mud () -> IO ()
 runCustard port mkWorld = do
@@ -79,33 +81,58 @@ type PlayerMap = M.Map (Id Player) (Output ClientMessage)
 
 -- | The server processes messages from clients.
 runServer :: Input ServerMessage -> Mud () -> IO ()
-runServer readMessage mkWorld = loop M.empty world where
-  world = execState mkWorld emptyMud
-  loop players state = do
-    msg <- readMessage
-    case msg of
-      NewClient tellClient -> do
-        let (p, state') = runState newPlayer state
-        let players' = M.insert p tellClient players
-        tellClient (Registered p)
-        (_, state'') <- runMud players' state' (prompt p)  -- cause messages to be sent
-        loop players' state''
-      Input p line -> do
-        (_, state') <- runMud players state (execute p line >> prompt p)
-        loop players state'
-      Disconnected _ -> undefined
-      Shutdown -> undefined
+runServer readMessage mkWorld = do
+  vState <- newMVar (emptyMud, M.empty)
+  runMud vState mkWorld
+  let loop = do
+        msg <- readMessage
+        case msg of
+          NewClient tellClient -> do
+            p <- runMud' vState newPlayer  -- note: doesn't flush effects yet
+            updatePlayerMap vState (M.insert p tellClient)
+            tellClient (Registered p)
+            runMud vState (prompt p)  -- note: does flush effects, which is okay now map contains player
+            loop
+          Input p line -> do
+            runMud vState (execute p line >> prompt p)
+            loop
+          Disconnected _ -> undefined
+          Shutdown -> undefined
+  loop
 
--- | Runs a Mud computation, yielding the result and the new state.
-runMud :: PlayerMap -> MudState -> Mud a -> IO (a, MudState)
-runMud ps state action = do
-  let (v, state')   = runState action state
-  let (ms, state'') = runState flushMessages state'
-  sendMessages ps ms
-  return (v, state'')
+updatePlayerMap :: ServerState -> (PlayerMap -> PlayerMap) -> IO ()
+updatePlayerMap vState f = do
+  (mud, players) <- takeMVar vState
+  putMVar vState (mud, f players)
 
--- | Sends all messages to the right clients.
-sendMessages :: PlayerMap -> [Message] -> IO ()
-sendMessages ps = mapM_ $ \(p, m) -> do
-  let tellClient = ps M.! p
-  tellClient (Output m)
+-- | Runs a Mud computation, updating the state and returning the computation's result.
+--   Doesn't execute any effects the action might have had.
+runMud' :: ServerState -> Mud a -> IO a
+runMud' vState action = do
+  (mud, players) <- takeMVar vState
+  let (v, mud') = runState action mud
+  putMVar vState (mud', players)
+  return v
+
+-- | Runs a Mud computation, updating the state and returning the computation's result.
+--   Then executes any effects the action might have had.
+runMud :: ServerState -> Mud a -> IO a
+runMud vState action = do
+  v <- runMud' vState action
+  executeEffects vState
+  return v
+
+-- | Executes the effects accumulated in the state.
+executeEffects :: ServerState -> IO ()
+executeEffects vState = do
+  effs <- runMud' vState flushEffects
+  (_, ps) <- readMVar vState
+  forM_ effs $ \eff -> case eff of
+    Message p m -> do
+      let tellClient = ps M.! p
+      tellClient (Output m)
+    Logoff p -> do
+      runMud' vState (doQuit p)
+      let tellClient = ps M.! p
+      tellClient Kill
+      updatePlayerMap vState (M.delete p)

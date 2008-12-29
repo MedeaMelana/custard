@@ -18,17 +18,20 @@ type IdSet a = IM.IntMap a
 byId :: Id a -> Accessor (IdSet a) a
 byId key = accessor (IM.! key) (IM.insert key)
 
-type Message = (Id Player, String)
+data Effect
+  = Message (Id Player) String
+  | Logoff (Id Player)
+  deriving (Eq, Show)
 
-type Verb = String -> Id Player -> Mud ()  -- issuer -> args -> action
+type Verb = String -> Id Player -> Mud ()  -- args -> issuer -> -> action
 type Verbs = M.Map String Verb  -- verb name -> verb
 
 data MudState = MudState
-  { mPlayers_   :: IdSet Player
-  , mRooms_     :: IdSet Room
-  , mIds_       :: [Int]
-  , mMessages_  :: [Message]
-  , mVerbs_     :: Verbs
+  { mPlayers_ :: IdSet Player
+  , mRooms_   :: IdSet Room
+  , mIds_     :: [Int]
+  , mEffects_ :: [Effect]
+  , mVerbs_   :: Verbs
   }
 
 emptyMud :: MudState
@@ -44,7 +47,7 @@ data Room = Room
   { rName_      :: String
   , rDesc_      :: String
   , rExits_     :: M.Map String (Id Room)
-  }
+  } deriving (Show, Eq)
 
 -- | A context determines a player's prompt and how their input is handled.
 --   Examples: login, normal play, reading a paged piece of text, in editor.

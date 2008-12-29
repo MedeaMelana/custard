@@ -3,7 +3,7 @@ module Mud where
 import qualified Data.IntMap as IM
 import qualified Data.Map as M
 import qualified Data.Char as C
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, listToMaybe)
 import Data.Accessor
 import Control.Monad.State
 import MudTypes
@@ -34,11 +34,13 @@ loginContext p = Context
         (False, _)  -> tellLn p "Sorry, that is not a valid name."
         (_, True)   -> tellLn p "Sorry, that name is already taken."
         _           -> do
-          room <- defaultRoom
+          mroom <- defaultRoom
           with (mPlayers .> byId p) $ do
             pName     %= Just name
             pContext  %= playContext p
-          appear room p
+          case mroom of
+            Nothing   -> look p
+            Just room -> appear room p
   }
 
 playContext :: Id Player -> Context
@@ -55,8 +57,8 @@ playContext p = Context
   }
 
 -- | Yield the room players end up in right after logging in.
-defaultRoom :: Mud (Id Room)
-defaultRoom = liftM (head . IM.keys) (getA mRooms)
+defaultRoom :: Mud (Maybe (Id Room))
+defaultRoom = liftM (listToMaybe . IM.keys) (getA mRooms)
 
 mkRoom :: String -> Mud (Id Room)
 mkRoom name = do
@@ -110,7 +112,11 @@ appear r p = do
 
 -- | Send a message to a player.
 tell :: Id Player -> String -> Mud ()
-tell p m = mMessages %: (++ [(p, m)])
+tell p m = addEffect (Message p m)
+
+-- | Registers a side effect to be executed by the server.
+addEffect :: Effect -> Mud ()
+addEffect eff = mEffects %: (++ [eff])
 
 -- | Calls tell with a newline appended to the message.
 tellLn :: Id Player -> String -> Mud ()
@@ -146,11 +152,11 @@ inRoom :: Id Player -> Id Room -> Mud Bool
 inRoom p r = liftM (== Just r) $ getA (mPlayers .> byId p .> pRoom)
 
 -- | Yields all collected messages and empties the buffer.
-flushMessages :: Mud [Message]
-flushMessages = do
-  ms <- getA mMessages
-  mMessages %= []
-  return ms
+flushEffects :: Mud [Effect]
+flushEffects = do
+  es <- getA mEffects
+  mEffects %= []
+  return es
 
 -- | Installs a verb.
 mkVerb :: String -> Verb -> Mud ()
@@ -200,3 +206,14 @@ look p = do
       case exitNames of
         []  -> return ()
         _   -> tellLn p ("Exits: " ++ listify exitNames ++ ".")
+
+-- | Causes the player to logoff.
+quit :: Id Player -> Mud ()
+quit p = do
+  tellLn p "Thank you for playing!"
+  addEffect (Logoff p)
+
+-- | Removes the player from the game, cleaning any pointers to it.
+--   This action produces no side effects.
+doQuit :: Id Player -> Mud ()
+doQuit p = mPlayers %: IM.delete p
