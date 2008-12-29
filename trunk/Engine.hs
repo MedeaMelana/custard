@@ -60,11 +60,11 @@ runListener tellServer sock = do
 runInputListener :: Id Player -> Handle -> Output ServerMessage -> IO ()
 runInputListener p h tellServer = do
   let loop = runInputListener p h tellServer
-  line <- hGetLine h
-  tellServer (Input p $ sanitizeInput line)
-  threadDelay 200000  -- hinder spam
-  -- todo: catch exceptions, test for eof
-  loop
+  let handle _ = tellServer (Disconnected p)
+  flip catch handle $ do
+    hGetLine h >>= tellServer . Input p . sanitizeInput
+    threadDelay 100000 -- hinder spam
+    loop
 
 -- | One per client: listens for ClientMessages from the server.
 runServerListener :: Id Player -> Handle -> Input ClientMessage -> IO ()
@@ -72,7 +72,7 @@ runServerListener p h listenToServer = do
   let loop = runServerListener p h listenToServer
   msg <- listenToServer
   case msg of
-    Output s      -> hPutStr h s >> hFlush h >> loop
+    Output s      -> catch (hPutStr h s >> hFlush h) (const $ return ()) >> loop
     Kill          -> hClose h
     Registered _  -> error "unexpected message from server: Registered"
 
@@ -96,7 +96,9 @@ runServer readMessage mkWorld = do
           Input p line -> do
             runMud vState (execute p line >> prompt p)
             loop
-          Disconnected _ -> undefined
+          Disconnected p -> do
+            runMud vState (disconnected p)
+            loop
           Shutdown -> undefined
   loop
 

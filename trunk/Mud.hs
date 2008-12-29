@@ -217,3 +217,12 @@ quit p = do
 --   This action produces no side effects.
 doQuit :: Id Player -> Mud ()
 doQuit p = mPlayers %: IM.delete p
+
+disconnected :: Id Player -> Mud ()
+disconnected p = do
+  mname <- getA (mPlayers .> byId p .> pName)
+  mroom <- getA (mPlayers .> byId p .> pRoom)
+  case (mname, mroom) of
+    (Just name, Just room)  -> sayLn room (/= p) (name ++ " vanishes in a puff of smoke.")
+    _                       -> return ()
+  addEffect (Logoff p)
