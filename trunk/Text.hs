@@ -18,9 +18,9 @@ type MatchRes = (String, String, String, [String])
 -- | Sanitizes and splits a command into verb and arguments.
 --   For example: say hello there --> ("say", "hello there")
 splitCommand :: String -> Maybe (String, String)
-splitCommand s = case sanitizeInput s =~ "^([^a-zA-Z]+|[a-zA-Z][^ ]*)" :: MatchRes of
-  (_, _, _, [])         -> Nothing
-  (_, _, args, [verb])  -> Just (verb, args)
+splitCommand s = case sanitizeInput s =~ "^([a-zA-Z]*[^a-zA-Z]?)" :: MatchRes of
+  (_, _, _, [""])       -> Nothing
+  (_, _, args, [verb])  -> Just (trim verb, args)
   _                     -> error "unexpected regex result"
 
 sanitizeInput :: String -> String
