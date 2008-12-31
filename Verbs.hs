@@ -18,15 +18,6 @@ playerSay msg p = do
       sayLn room (/= p) (name ++ " says: " ++ trimmed)
       tellLn p ("You say: " ++ trimmed)
 
--- chat :: Verb
--- chat msg p = do
---   let trimmed = trim msg
---   if null trimmed
---     then tellLn p "Chat what?"
---     else do
---       Just name <- getA (mPlayers .> byId p .> pName)
---       shoutLn (const True) ("(chat) " ++ name ++ ": " ++ trimmed)
-
 chat :: Verb
 chat msg = chatEmote (": " ++ msg)
 
