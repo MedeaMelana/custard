@@ -23,11 +23,3 @@ Parameters: Chan ClientMessage, Handle.
   * Listens to messages from the server:
     * Output. Send output to the client's terminal.
     * Kill. Forcibly terminates the session with the client.
-
-
-
-
-Todo:
-* Id Player altijd als laatst meegeven.
-* exits meer params geven (exit/enter messages)
-* Disconnected bouwen

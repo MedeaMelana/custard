@@ -43,11 +43,20 @@ data Player = Player
   , pContext_ :: Context
   }
 
+-- | Rooms are physical locations players will occupy.
 data Room = Room
-  { rName_      :: String
-  , rDesc_      :: String
-  , rExits_     :: M.Map String (Id Room)
-  } deriving (Show, Eq)
+  { rName_      :: String             -- ^ Short title.
+  , rDesc_      :: String             -- ^ Longer description.
+  , rExits_     :: M.Map String Exit  -- ^ Maps from exit name to exit descriptor.
+  }
+
+-- | Exits allow players to walk from one room to another by entering the exit's name.
+data Exit = Exit
+  { eTarget_  :: Id Room          -- ^ Where the exit leads to.
+  , e1PGo_    :: String           -- ^ What the player sees when moving.
+  , e3PLeave_ :: String -> String -- ^ What others in the source room see. Arg: player name.
+  , e3PEnter_ :: String -> String -- ^ What others in the target room see. Arg: player name.
+  }
 
 -- | A context determines a player's prompt and how their input is handled.
 --   Examples: login, normal play, reading a paged piece of text, in editor.
@@ -59,4 +68,5 @@ data Context = Context
 $( deriveAccessors ''MudState )
 $( deriveAccessors ''Player )
 $( deriveAccessors ''Room )
+$( deriveAccessors ''Exit )
 $( deriveAccessors ''Context )

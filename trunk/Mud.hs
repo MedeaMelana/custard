@@ -67,18 +67,11 @@ mkRoom name = do
   mRooms %: IM.insert rid room
   return rid
 
-mkExits :: Id Room -> [(String, Id Room)] -> Mud ()
+mkExits :: Id Room -> [(String, Exit)] -> Mud ()
 mkExits r = sequence_ . map (mkExit r)
 
-mkExit :: Id Room -> (String, Id Room) -> Mud ()
+mkExit :: Id Room -> (String, Exit) -> Mud ()
 mkExit r (ex, er) = mRooms .> byId r .> rExits %: M.insert ex er
-
-north = "north"
-east = "east"
-south = "south"
-west = "west"
-up = "up"
-down = "down"
 
 prompt :: Id Player -> Mud ()
 prompt p = do
@@ -166,21 +159,22 @@ mkVerb verb action = mVerbs %: M.insert verb action
 mkSimpleVerb :: String -> (Id Player -> Mud ()) -> Mud ()
 mkSimpleVerb verb action = mkVerb verb (const action)
 
-
 move :: String -> Id Player -> Mud ()
-move exit p = do
+move exitName p = do
   Just fromId <- getA (mPlayers .> byId p .> pRoom)
-  mDestId     <- liftM (M.lookup exit) $ getA (mRooms .> byId fromId .> rExits)
+  mExit       <- M.lookup exitName `liftM` getA (mRooms .> byId fromId .> rExits)
   Just pname  <- getA (mPlayers .> byId p .> pName)
-  case mDestId of
+  case mExit of
     Nothing -> tellLn p "You cannot go in that direction."
-    Just destId -> do
-      sayLn fromId (/= p) (pname ++ " leaves " ++ exit ++ ".")
+    Just exit -> do
+      let destId = exit ^. eTarget
+      tellLn p (exit ^. e1PGo)
+      sayLn fromId (/= p) (exit ^. e3PLeave $ pname)
+      sayLn destId (/= p) (exit ^. e3PEnter $ pname)
       mPlayers .> byId p .> pRoom %= Just destId
-      sayLn destId (/= p) (pname ++ " enters.")
       look p
-      -- | Describe a player's surroundings to them.
 
+-- | Describe a player's surroundings to them.
 look :: Id Player -> Mud ()
 look p = do
   mr <- getA (mPlayers .> byId p .> pRoom)
