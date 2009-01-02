@@ -5,7 +5,7 @@ import qualified Data.Map as M
 import qualified Data.Char as C
 import Data.Maybe (catMaybes, listToMaybe)
 import Data.Accessor
-import Control.Monad.State
+import Control.Monad
 import MudTypes
 import Text
 import With
@@ -204,7 +204,10 @@ look p = do
 -- | Causes the player to logoff.
 quit :: Id Player -> Mud ()
 quit p = do
+  Just name <- getA (mPlayers .> byId p .> pName)
+  Just room <- getA (mPlayers .> byId p .> pRoom)
   tellLn p "Thank you for playing!"
+  sayLn room (/= p) (name ++ " vanishes in a puff of smoke.")
   addEffect (Logoff p)
 
 -- | Removes the player from the game, cleaning any pointers to it.

@@ -2,10 +2,14 @@
 
 module Engine where
 
+import Prelude hiding (catch)
 import Network
 import System.IO
 import Control.Concurrent
 import Control.Monad.State
+import Control.Exception
+import Control.Arrow ((***))
+import Data.IORef
 import qualified Data.List as L
 import qualified Data.Char as C
 import qualified Data.Map as M
@@ -29,7 +33,7 @@ data ClientMessage
   | Output String
   | Kill
 
-type ServerState = MVar (MudState, PlayerMap)
+type ServerState = IORef (MudState, PlayerMap)
 
 -- | Spawns the server, then becomes the listener.
 runCustard :: PortNumber -> Mud () -> IO ()
@@ -60,7 +64,8 @@ runListener tellServer sock = do
 runInputListener :: Id Player -> Handle -> Output ServerMessage -> IO ()
 runInputListener p h tellServer = do
   let loop = runInputListener p h tellServer
-  let handle _ = tellServer (Disconnected p)
+  let handle :: SomeException -> IO ()
+      handle _ = tellServer (Disconnected p)
   flip catch handle $ do
     hGetLine h >>= tellServer . Input p . sanitizeInput
     threadDelay 100000 -- hinder spam
@@ -72,7 +77,10 @@ runServerListener p h listenToServer = do
   let loop = runServerListener p h listenToServer
   msg <- listenToServer
   case msg of
-    Output s      -> catch (hPutStr h s >> hFlush h) (const $ return ()) >> loop
+    Output s      -> do
+      let handle :: SomeException -> IO ()
+          handle _ = return ()
+      catch (hPutStr h s >> hFlush h) handle >> loop
     Kill          -> hClose h
     Registered _  -> error "unexpected message from server: Registered"
 
@@ -82,53 +90,70 @@ type PlayerMap = M.Map (Id Player) (Output ClientMessage)
 -- | The server processes messages from clients.
 runServer :: Input ServerMessage -> Mud () -> IO ()
 runServer readMessage mkWorld = do
-  vState <- newMVar (emptyMud, M.empty)
+  vState <- newIORef (emptyMud, M.empty)
   runMud vState mkWorld
   let loop = do
         msg <- readMessage
         case msg of
           NewClient tellClient -> do
-            p <- runMud' vState newPlayer  -- note: doesn't flush effects yet
+            Right p <- runMud' vState newPlayer  -- note: doesn't flush effects yet
             updatePlayerMap vState (M.insert p tellClient)
             tellClient (Registered p)
             runMud vState (prompt p)  -- note: does flush effects, which is okay now map contains player
             loop
           Input p line -> do
-            runMud vState (execute p line >> prompt p)
+            result <- runMud vState (execute p line >> prompt p)
+            case result of
+              Left e -> do
+                putStrLn ("Error: " ++ show e)
+                putStrLn ("On executing input: " ++ show line)
+              Right _ -> return ()
             loop
           Disconnected p -> do
-            runMud vState (disconnected p)
+            -- either the client disconnected
+            --    or we closed the connection
+            (_, ps) <- readIORef vState
+            when (p `M.member` ps) $ do
+              runMud vState (disconnected p)
+              return ()
             loop
           Shutdown -> undefined
   loop
 
 updatePlayerMap :: ServerState -> (PlayerMap -> PlayerMap) -> IO ()
-updatePlayerMap vState f = do
-  (mud, players) <- takeMVar vState
-  putMVar vState (mud, f players)
+updatePlayerMap vState f = modifyIORef vState (id *** f)
+
+deepTupleSeq :: (a, b) -> (a, b)
+deepTupleSeq (x, y) = x `seq` y `seq` (x, y)
 
 -- | Runs a Mud computation, updating the state and returning the computation's result.
 --   Doesn't execute any effects the action might have had.
-runMud' :: ServerState -> Mud a -> IO a
+runMud' :: ServerState -> Mud a -> IO (Either SomeException a)
 runMud' vState action = do
-  (mud, players) <- takeMVar vState
-  let (v, mud') = runState action mud
-  putMVar vState (mud', players)
-  return v
+  (mud, players) <- readIORef vState
+  result <- try $ evaluate $ deepTupleSeq $ runState action mud
+  case result of
+    Left e -> return (Left e)
+    Right (v, mud') -> do
+      writeIORef vState (mud', players)
+      return (Right v)
 
 -- | Runs a Mud computation, updating the state and returning the computation's result.
 --   Then executes any effects the action might have had.
-runMud :: ServerState -> Mud a -> IO a
+runMud :: ServerState -> Mud a -> IO (Either SomeException a)
 runMud vState action = do
-  v <- runMud' vState action
-  executeEffects vState
-  return v
+  result <- runMud' vState action
+  case result of
+    Left e  -> return (Left e)
+    Right v -> do
+      executeEffects vState
+      return (Right v)
 
 -- | Executes the effects accumulated in the state.
 executeEffects :: ServerState -> IO ()
 executeEffects vState = do
-  effs <- runMud' vState flushEffects
-  (_, ps) <- readMVar vState
+  Right effs <- runMud' vState flushEffects
+  (_, ps) <- readIORef vState
   forM_ effs $ \eff -> case eff of
     Message p m -> do
       let tellClient = ps M.! p
