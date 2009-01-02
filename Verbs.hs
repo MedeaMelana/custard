@@ -3,7 +3,9 @@ module Verbs where
 import Mud
 import MudTypes
 import Text
+import Parser
 import Data.Accessor
+import Control.Applicative
 import qualified Data.Map as M
 import qualified Data.Char as C
 
@@ -45,12 +47,18 @@ mkSoul name first third = mkSimpleVerb name $ \p -> do
   tellLn p ("You " ++ first)
   sayLn room (/= p) (name ++ " " ++ third)
 
-    
-
 help :: Verb
 help _ p = do
   verbs <- M.keys `fmap` getA mVerbs
   tellLn p ("Available commands: " ++ listify verbs ++ ".")
+
+playerTell :: Verb
+playerTell = parse (doTell <$> pPlayer <*> pRest)
+  where doTell target msg source = do
+          Just sourceName <- getA (mPlayers .> byId source .> pName)
+          Just targetName <- getA (mPlayers .> byId target .> pName)
+          tellLn source ("You tell " ++ targetName ++ ": " ++ msg)
+          tellLn target (sourceName ++ " tells you: " ++ msg)
 
 installVerbs :: Mud ()
 installVerbs = do
@@ -76,3 +84,5 @@ installVerbs = do
   mkSoul "smile" "smile." "smiles."
   mkSoul "grin" "grin." "grins."
   mkSoul "wave" "wave." "waves."
+  mkVerb "tell" playerTell
+  mkVerb "t" playerTell

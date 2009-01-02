@@ -223,3 +223,11 @@ disconnected p = do
     (Just name, Just room)  -> sayLn room (/= p) (name ++ " vanishes in a puff of smoke.")
     _                       -> return ()
   addEffect (Logoff p)
+
+playerByName :: String -> Mud (Maybe (Id Player))
+playerByName name = do
+  let lowerName = map C.toLower name
+  ps <- IM.toList `fmap` getA mPlayers
+  case [ pid | (pid, p) <- ps, Just lowerName == fmap C.toLower `fmap` (p ^. pName) ] of
+    pid : _ -> return (Just pid)
+    []    -> return Nothing
