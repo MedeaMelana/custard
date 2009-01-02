@@ -19,8 +19,8 @@ byId :: Id a -> Accessor (IdSet a) a
 byId key = accessor (IM.! key) (IM.insert key)
 
 data Effect
-  = Message (Id Player) String
-  | Logoff (Id Player)
+  = Message (Id Player) String  -- ^ Send a message to a player's terminal.
+  | Logoff (Id Player)          -- ^ Signals that the player is no longer referred to in the game.
   deriving (Eq, Show)
 
 type Verb = String -> Id Player -> Mud ()  -- args -> issuer -> -> action
