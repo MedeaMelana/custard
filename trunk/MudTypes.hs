@@ -23,6 +23,7 @@ data Effect
   | Logoff (Id Player)          -- ^ Signals that the player is no longer referred to in the game.
   deriving (Eq, Show)
 
+type SimpleVerb = Id Player -> Mud ()
 type Verb = String -> Id Player -> Mud ()  -- args -> issuer -> -> action
 type Verbs = M.Map String Verb  -- verb name -> verb
 
