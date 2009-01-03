@@ -10,19 +10,22 @@ import qualified Data.IntMap as IM
 import qualified Data.Map as M
 import qualified Data.Char as C
 
-playerSay :: Verb
-playerSay msg p = do
-  let trimmed = trim msg
+withArg :: String -> Verb -> Verb
+withArg error verb args player = do
+  let trimmed = trim args
   if null trimmed
-    then tellLn p "Say what?"
-    else do
-      Just room <- getA (mPlayers .> byId p .> pRoom)
-      Just name <- getA (mPlayers .> byId p .> pName)
-      sayLn room (/= p) (name ++ " says: " ++ trimmed)
-      tellLn p ("You say: " ++ trimmed)
+    then tellLn player error
+    else verb trimmed player
+
+playerSay :: Verb
+playerSay = withArg "Say what?" $ \msg p -> do
+  Just room <- getA (mPlayers .> byId p .> pRoom)
+  Just name <- getA (mPlayers .> byId p .> pName)
+  sayLn room (/= p) (name ++ " says: " ++ msg)
+  tellLn p ("You say: " ++ msg)
 
 chat :: Verb
-chat msg = chatEmote (": " ++ msg)
+chat = withArg "Chat what?" $ \msg -> chatEmote (": " ++ msg)
 
 chatEmote :: Verb
 chatEmote msg p = do
@@ -34,7 +37,7 @@ chatEmote msg p = do
       shoutLn (const True) ("(chat) " ++ name ++ sep ++ c:cs)
 
 emote :: Verb
-emote msg p = do
+emote = withArg "Emote what?" $ \msg p -> do
   Just room <- getA (mPlayers .> byId p .> pRoom)
   Just name <- getA (mPlayers .> byId p .> pName)
   let line = name ++ " " ++ trim msg
@@ -48,8 +51,8 @@ mkSoul name first third = mkSimpleVerb name $ \p -> do
   tellLn p ("You " ++ first)
   sayLn room (/= p) (name ++ " " ++ third)
 
-help :: Verb
-help _ p = do
+help :: SimpleVerb
+help p = do
   verbs <- M.keys `fmap` getA mVerbs
   tellLn p ("Available commands: " ++ listify verbs ++ ".")
 
@@ -86,7 +89,7 @@ installVerbs = do
   mkVerb "chat:" chatEmote
   mkVerb "emote" emote
   mkVerb ":" emote
-  mkVerb "help" help
+  mkSimpleVerb "help" help
   mkSoul "nod" "nod." "nods."
   mkSoul "shake" "shake your head." "shakes their head."
   mkSoul "smile" "smile." "smiles."
