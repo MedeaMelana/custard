@@ -21,7 +21,7 @@ pWord :: MudParser String
 pWord = many (noneOf " ") <* spaces
 
 pRest :: MudParser String
-pRest = many anyChar <* eof
+pRest = many1 anyChar <* eof <?> "argument"
 
 parse :: MudParser (Id Player -> Mud ()) -> Verb
 parse grammar input player = do
