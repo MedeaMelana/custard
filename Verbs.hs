@@ -6,6 +6,7 @@ import Text
 import Parser
 import Data.Accessor
 import Control.Applicative
+import qualified Data.IntMap as IM
 import qualified Data.Map as M
 import qualified Data.Char as C
 
@@ -60,6 +61,12 @@ playerTell = parse (doTell <$> pPlayer <*> pRest)
           tellLn source ("You tell " ++ targetName ++ ": " ++ msg)
           tellLn target (sourceName ++ " tells you: " ++ msg)
 
+who :: SimpleVerb
+who p = do
+  ps <- IM.elems `fmap` getA mPlayers
+  let names = [ name | p <- ps, let Just name = p ^. pName ]
+  tellLn p ("Players online: " ++ listify names ++ ".")
+
 installVerbs :: Mud ()
 installVerbs = do
   mkSimpleVerb "l" look
@@ -72,6 +79,7 @@ installVerbs = do
   mkSimpleVerb "d" (move "down")
   mkSimpleVerb "q" quit
   mkSimpleVerb "quit" quit
+  mkSimpleVerb "who" who
   mkVerb "say" playerSay
   mkVerb "'" playerSay
   mkVerb "chat" chat
