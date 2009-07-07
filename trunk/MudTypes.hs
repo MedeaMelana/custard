@@ -15,6 +15,8 @@ type Id a = Int
 
 type IdSet a = IM.IntMap a
 
+type I a = (Id a, a)
+
 byId :: Id a -> Accessor (IdSet a) a
 byId key = accessor (IM.! key) (IM.insert key)
 
@@ -30,13 +32,14 @@ type Verbs = M.Map String Verb  -- verb name -> verb
 data MudState = MudState
   { mPlayers_ :: IdSet Player
   , mRooms_   :: IdSet Room
+  , mObjects_ :: IdSet Object
   , mIds_     :: [Int]
   , mEffects_ :: [Effect]
   , mVerbs_   :: Verbs
   }
 
 emptyMud :: MudState
-emptyMud = MudState IM.empty IM.empty [0..] [] M.empty
+emptyMud = MudState IM.empty IM.empty IM.empty [0..] [] M.empty
 
 data Player = Player
   { pName_    :: Maybe String
@@ -66,8 +69,31 @@ data Context = Context
   , cExecute_ :: String -> Mud () -- ^ Executes the player's input.
   }
 
+data Object = Object
+  { oNoun_ :: String
+  , oLoc_  :: Location
+  }
+
+data Location
+  = InRoom (Id Room)
+  | OnPlayer (Id Player)
+  | InContainer (Id Object)
+  | Nowhere
+  deriving Eq
+
+inRoom :: Id Room -> Object -> Bool
+inRoom rid obj = oLoc_ obj == InRoom rid
+
+onPlayer :: Id Player -> Object -> Bool
+onPlayer pid obj = oLoc_ obj == OnPlayer pid
+
+inContainer :: Id Object -> Object -> Bool
+inContainer oid obj = oLoc_ obj == InContainer oid
+
+
 $( deriveAccessors ''MudState )
 $( deriveAccessors ''Player )
 $( deriveAccessors ''Room )
 $( deriveAccessors ''Exit )
 $( deriveAccessors ''Context )
+$( deriveAccessors ''Object )

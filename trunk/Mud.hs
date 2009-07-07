@@ -1,3 +1,5 @@
+{-# LANGUAGE RecursiveDo #-}
+
 module Mud where
 
 import qualified Data.IntMap as IM
@@ -6,9 +8,37 @@ import qualified Data.Char as C
 import Data.Maybe (catMaybes, listToMaybe)
 import Data.Accessor
 import Control.Monad
+import Control.Applicative
 import MudTypes
 import Text
 import With
+
+class MudEntity a where
+  entityAccessor :: Accessor MudState (IdSet a)
+
+instance MudEntity Room where
+  entityAccessor = mRooms
+
+instance MudEntity Player where
+  entityAccessor = mPlayers
+
+instance MudEntity Object where
+  entityAccessor = mObjects
+
+selectById :: MudEntity a => Id a -> Mud a
+selectById i = getA (entityAccessor .> byId i)
+
+create :: MudEntity a => a -> Mud (Id a)
+create x = do
+  xid <- nextId
+  entityAccessor %: IM.insert xid x
+  return xid
+
+select :: MudEntity a => (a -> Bool) -> Mud [I a]
+select p = filter (p . snd) . IM.toList <$> getA entityAccessor
+
+update :: MudEntity a => Id a -> (a -> a) -> Mud ()
+update i f = entityAccessor .> byId i %: f
 
 nextId :: Mud (Id a)
 nextId = do
@@ -17,10 +47,8 @@ nextId = do
   return i
 
 newPlayer :: Mud (Id Player)
-newPlayer = do
-  pid <- nextId
-  let player = Player Nothing Nothing (loginContext pid)
-  mPlayers %: (IM.insert pid player)
+newPlayer = mdo
+  pid <- create (Player Nothing Nothing (loginContext pid))
   tellLn pid "Welcome to Custard!"
   return pid
 
@@ -140,9 +168,9 @@ playersInRoom room = do
   let inRoom = (== Just room) . (^. pRoom) . (pmap IM.!)
   return . filter inRoom . IM.keys $ pmap
 
--- | Tells whether a player is in the given room.
-inRoom :: Id Player -> Id Room -> Mud Bool
-inRoom p r = liftM (== Just r) $ getA (mPlayers .> byId p .> pRoom)
+-- -- | Tells whether a player is in the given room.
+-- inRoom :: Id Player -> Id Room -> Mud Bool
+-- inRoom p r = liftM (== Just r) $ getA (mPlayers .> byId p .> pRoom)
 
 -- | Yields all collected messages and empties the buffer.
 flushEffects :: Mud [Effect]
@@ -186,9 +214,13 @@ look p = do
 
       -- Room name.
       tellLn p (room ^. rName)
+      
+      -- Objects lying around.
+      objs <- select (inRoom r)
+      unless (null objs) $ tellLn p $ "Lying on the floor: " ++ listify (map (oNoun_ . snd) objs) ++ "."
 
       -- Players in room.
-      ps <- liftM (filter (/= p)) (playersInRoom r)
+      ps <- filter (/= p) <$> playersInRoom r
       playerNames <- liftM catMaybes $ forM ps $ \q -> getA (mPlayers .> byId q .> pName)
       case playerNames of
         []  -> return ()
@@ -231,3 +263,7 @@ playerByName name = do
   case [ pid | (pid, p) <- ps, Just lowerName == fmap C.toLower `fmap` (p ^. pName) ] of
     pid : _ -> return (Just pid)
     []    -> return Nothing
+
+class IsLocation loc where
+  toLocation :: loc -> Location
+  

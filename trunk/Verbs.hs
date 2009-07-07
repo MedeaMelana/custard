@@ -9,6 +9,8 @@ import Control.Applicative
 import qualified Data.IntMap as IM
 import qualified Data.Map as M
 import qualified Data.Char as C
+import Control.Monad
+import Data.Maybe
 
 withArg :: String -> Verb -> Verb
 withArg error verb args player = do
@@ -57,7 +59,7 @@ help p = do
   tellLn p ("Available commands: " ++ listify verbs ++ ".")
 
 playerTell :: Verb
-playerTell = parse (doTell <$> pPlayer <*> pRest)
+playerTell = parse (doTell <$> pPlayer (const True) <*> pRest)
   where doTell target msg source = do
           Just sourceName <- getA (mPlayers .> byId source .> pName)
           Just targetName <- getA (mPlayers .> byId target .> pName)
@@ -69,6 +71,56 @@ who p = do
   ps <- IM.elems `fmap` getA mPlayers
   let names = [ name | p <- ps, let Just name = p ^. pName ]
   tellLn p ("Players online: " ++ listify names ++ ".")
+
+inventory :: SimpleVerb
+inventory p = do
+  objs <- select (onPlayer p)
+  case null objs of
+    True  -> tellLn p "You aren't carrying anything."
+    False -> tellLn p $ "You are carrying: " ++ listify (map (oNoun_ . snd) objs) ++ "."
+
+get :: Verb
+get args pid = do
+    mr <- getA (mPlayers .> byId pid .> pRoom)
+    case mr of
+      Nothing -> tellLn pid "You aren't anywhere."
+      Just r  -> parse (doGet <$> pObject (inRoom r)) args pid
+  where
+    doGet item p = mObjects .> byId item .> oLoc %= OnPlayer p
+
+dropObj :: Verb
+dropObj args pid = do
+    mr <- (^. pRoom) <$> selectById pid
+    case mr of
+      Nothing -> tellLn pid "You aren't anywhere."
+      Just r  -> parse (doDrop r <$> pObject (onPlayer pid)) args pid
+  where
+    doDrop room item pid = mObjects .> byId item .> oLoc %= InRoom room
+
+give :: Verb
+give args pid = do
+    mr <- (^. pRoom) <$> selectById pid
+    parse (doGive mr <$> pObject (onPlayer pid) <* pWord "to" <*> pPlayer (pRoom ^.= mr)) args pid
+  where
+    doGive mr oid tid _ = do
+      -- Set new location.
+      update oid (oLoc ^= OnPlayer tid)
+      -- Fetch names.
+      objName         <- (^. oNoun) <$> selectById oid
+      Just sourceName <- (^. pName) <$> selectById pid
+      Just targetName <- (^. pName) <$> selectById tid
+      -- Send messages.
+      tellLn pid $ "You give " ++ objName ++ " to " ++ targetName ++ "."
+      tellLn tid $ sourceName ++ " gives you " ++ objName ++ "."
+      when (isJust mr) $ do
+        sayLn (fromJust mr) ((/= pid) & (/= tid)) $ sourceName ++ " gives " ++ objName ++ " to " ++ targetName ++ "."
+
+(&) :: (a -> Bool) -> (a -> Bool) -> a -> Bool
+(f & g) x = f x && g x
+
+(^.=) :: Eq a => Accessor r a -> a -> r -> Bool
+(field ^.= val) rec = (rec ^. field) == val
+
 
 installVerbs :: Mud ()
 installVerbs = do
@@ -97,3 +149,9 @@ installVerbs = do
   mkSoul "wave" "wave." "waves."
   mkVerb "tell" playerTell
   mkVerb "t" playerTell
+  mkSimpleVerb "i" inventory
+  mkSimpleVerb "inv" inventory
+  mkSimpleVerb "inventory" inventory
+  mkVerb "get" get
+  mkVerb "drop" dropObj
+  mkVerb "give" give

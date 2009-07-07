@@ -21,6 +21,11 @@ mkWorld = do
   mkExits kitchen [west living]
   mkExits bedroom [eDown living, eWardrobe wardrobe]
   mkExits wardrobe [eOut bedroom]
+  
+  -- Create some objects.
+  flower <- create (Object "flower" (InRoom garden))
+  
+  return ()
 
 mkStdExit :: String -> String -> Id Room -> (String, Exit)
 mkStdExit toDir fromDir target = (toDir, Exit

@@ -5,20 +5,35 @@ import Mud
 import Text.Parsec
 import Control.Applicative hiding (many)
 import Control.Monad.Trans
+import Data.Accessor
+import Text
 
 type MudParser = ParsecT String () Mud
 
-pPlayer :: MudParser (Id Player)
-pPlayer = try p <?> "player name" where
+pPlayer :: (Player -> Bool) -> MudParser (Id Player)
+pPlayer f = try p <?> "player name" where
   p = do
-    name <- pWord
-    mp <- lift (playerByName name)
-    case mp of
-      Nothing -> empty
-      Just p  -> return p
+    name <- pAnyWord
+    (pl, _) : _ <- lift $ select $ \p -> case p ^. pName of
+      Nothing -> False
+      Just name' -> name `equalsIgnoreCase` name' && f p
+    return pl
 
-pWord :: MudParser String
-pWord = many (noneOf " ") <* spaces
+pObject :: (Object -> Bool) -> MudParser (Id Object)
+pObject f = do
+  os <- lift (select f)
+  let p = do
+        noun <- pAnyWord
+        case filter ((== noun) . oNoun_ . snd) os of
+          []            -> fail $ "no such item: " ++ noun
+          (oid, _) : _  -> return oid
+  try p <?> "item"
+
+pAnyWord :: MudParser String
+pAnyWord = many (noneOf " ") <* spaces
+
+pWord :: String -> MudParser ()
+pWord word = () <$ string word <* spaces
 
 pRest :: MudParser String
 pRest = many1 anyChar <* eof <?> "argument"
