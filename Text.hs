@@ -38,3 +38,6 @@ listify [] = ""
 listify [x] = x
 listify [x, y] = x ++ " and " ++ y
 listify (x:xs) = x ++ ", " ++ listify xs
+
+equalsIgnoreCase :: String -> String -> Bool
+equalsIgnoreCase xs ys = map toLower xs == map toLower ys
